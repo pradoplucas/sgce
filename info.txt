@@ -1,0 +1,28 @@
+script.py
+
+Eu perdi a noção da complexidade desse código..
+
+A ideia é rodar ele uma vez para salvar os ids de todos os certificados, de todas as pessoas, de todos os anos, de todos os campus, em um json com a seguinte estrutura:
+
+result.json - {name:{year:cert[]}}
+    -nome: nome da pessoa
+        -year: anos em que ela tem certificado
+            -cert[]: lista com os ids dos certificados daquele ano
+
+E depois, de vez em quando, rodar ele para dalvar os dados de novos eventos que foram gerados.
+
+O script tem 4 funções:
+    stage_1(): salva os ids dos eventos em um dict, separando por ano;
+    stage_2(): gera os certificados de todos os eventos, separando por ano, e especifico de cada pessoa;
+    stage_3(): salva os eventos(eventos.json) e os certificados(result.json) em arquivos json;
+    stage_id(): recebe os dados de uma execução anterior e retorna as diferenças e os novos dados encontrados.
+
+Para executar, sempre, é necessário colocar os seguintes valores para as variáveis:
+    campus = ''
+    year = ['2014', '2015', '2016', '2017', '2018', '2019', '2020']
+
+Para executar a primeira vez, que é a geral, é necessário colocar:
+    update = False
+
+Para executar nas próximas vezes, apenas para atualizar:
+    update = True
