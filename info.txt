@@ -4,7 +4,11 @@ Eu perdi a noção da complexidade desse código..
 
 A ideia é rodar ele uma vez para salvar os ids de todos os certificados, de todas as pessoas, de todos os anos, de todos os campus, em um json com a seguinte estrutura:
 
-result.json - {name:{year:cert[]}}
+events.json - {year:[[id_event,name_event]]}
+
+
+
+result.json - {name:{year:[[id_cert,name_event]]}}
     -nome: nome da pessoa
         -year: anos em que ela tem certificado
             -cert[]: lista com os ids dos certificados daquele ano
