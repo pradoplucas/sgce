@@ -33,14 +33,14 @@ def main():
     #1 -> Run
     #2 -> Join Certificates
 
-    action = 3
+    action = 0
 
     #   CT -> 1   AP -> 2    CM -> 3    DV -> 4    FB -> 5    GP -> 6   LD -> 7
     #   MD -> 8   PB -> 9    PG -> 10   SH -> 11   TD -> 12   CP -> 13
     campus = ''
 
     #   2013 -> 2014 -> 2015 -> 2016 -> 2017 -> 2018 -> 2019 -> 2020
-    year = ['2014', '2015', '2016', '2017', '2018', '2019', '2020']
+    year = ['2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021']
     #year = ['2020']
 
     url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica/'
@@ -205,7 +205,7 @@ def stage_3(events_, students_, year_):
 def diff_events(events_old, events_new):
 
     events_diff = {}
-
+    '''
     for year, e_new in events_new.items():
         for evnt in e_new:
             if year not in events_old:
@@ -214,6 +214,18 @@ def diff_events(events_old, events_new):
             if(events_old[year].count(evnt) == 0):
                 if year in events_diff:
                     events_diff[year].append([evnt])
+                else:
+                    events_diff[year] = [evnt]
+    '''
+
+    for year, e_new in events_new.items():
+        for evnt in e_new:
+            if year not in events_old:
+                events_old[year] = []
+
+            if(events_old[year].count(evnt) == 0):
+                if year in events_diff:
+                    events_diff[year].append(evnt)
                 else:
                     events_diff[year] = [evnt]
 
