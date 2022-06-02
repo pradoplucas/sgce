@@ -30,3 +30,16 @@ Para executar a primeira vez, que é a geral, é necessário colocar:
 
 Para executar nas próximas vezes, apenas para atualizar:
     update = True
+
+
+2013: 0
+2014: 2
+2015: 4
+2016: 99
+2017: 148
+2018: 199
+2019: 205
+2020: 87
+2021: 94
+2022: 11
+
