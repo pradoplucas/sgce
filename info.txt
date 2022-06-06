@@ -43,3 +43,20 @@ Para executar nas próximas vezes, apenas para atualizar:
 2021: 94
 2022: 11
 
+========================================
+============ Funcionamento =============
+========================================
+
+2 Coleções no BD (Event e Owner)
+    Para se comunicar com o sistema
+
+2 arquivos JSON (Event e Owner)
+    Para se comunicar com o bot e alimentar o sistema
+
+Fazer backup dos 2 JSONs para o GitHub todo dia antes de atualizar.
+
+
+
+
+
+

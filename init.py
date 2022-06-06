@@ -1,0 +1,14 @@
+import pymongo
+import json
+
+myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+mydb = myclient["certs"]
+
+mycol_events = mydb["events"]
+mycol_owners = mydb["owners"]
+
+events = json.loads(open('events.json').read())
+owners = json.loads(open('owners.json').read())
+
+mycol_events.insert_many(events)
+mycol_owners.insert_many(owners)

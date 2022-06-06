@@ -1,7 +1,8 @@
 import requests
 import json
 import os
-import datetime
+from datetime import date
+import time
 import shutil
 from collections import OrderedDict 
 
@@ -10,29 +11,23 @@ from unidecode import unidecode
 import Levenshtein
 import pymongo
 
+url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica/'
+url_search = 'http://apl.utfpr.edu.br/extensao/certificados/listaCertificadosPublicos/'
 
-#2014   -> 00:00:56
-#2015   -> 00:04:38
-#2015   -> 00:45:36
-#2017/1 -> 00:32:14
-#2017/2 -> 00:36:55
-#2017/3 -> 00:43:09
-#2018/1 -> 00:24:40
-#2018/2 -> 00:21:36
-#2018/3 -> 00:26:30
-#2018/4 -> 00:23:24
-#2018/5 -> 00:32:21
-#2019/1 -> 00:18:53
-#2019/2 -> 00:18:23
-#2019/3 -> 00:27:13
-#2019/4 -> 00:19:46
-#2019/5 -> 00:21:37
-#2019/6 -> 00:34:55
-#2020/1 -> 00:29:47
+def init_db():
+    #   CT -> 1   AP -> 2    CM -> 3    DV -> 4    FB -> 5    GP -> 6   LD -> 7
+    #   MD -> 8   PB -> 9    PG -> 10   SH -> 11   TD -> 12   CP -> 13
+    campus = '13'
 
-#som a cada ano
-#nome dos eventos
-#separar funções
+    #   2013 -> 2014 -> 2015 -> 2016 -> 2017 -> 2018 -> 2019 -> 2020 -> 2021 -> 2022
+    year = '2018'
+
+    events = []
+    owners = []
+
+    events = find_events_year(campus, url, year)
+    events, owners = find_owners(events, url_search)
+    save_json(events, owners, year)
 
 def find_events_all(campus_, url_):
     events_ = []
@@ -174,171 +169,94 @@ def save_json(events_, owners_, year_ = ''):
     open(path + '/events_' + year_ +'.json', 'wt').write(json.dumps(events_))
     open(path + '/owners_ ' + year_ + '.json', 'wt').write(json.dumps(owners_))
 
-def join_owners():
-    #Tirar NBS e excessos
-    #Isso pode gerar duplicidade
-    path_old = 'new_output/owners/old_split_unidecode/'
-    path_new = 'new_output/owners/'
+def update_db():
+    #   CT -> 1   AP -> 2    CM -> 3    DV -> 4    FB -> 5    GP -> 6   LD -> 7
+    #   MD -> 8   PB -> 9    PG -> 10   SH -> 11   TD -> 12   CP -> 13
+    campus_code = '13'
 
-    dir_list = os.listdir(path_old)
+    year = str(date.today().year)
 
-    owners_new = {}
+    events = []
+    owners = []
+
+    events = find_only_events(campus_code, year)
+    events = get_qty_certs(events)
+    events = events_diff(events, year)
+
+
+
+# Find only the events, not the certificates
+# Only one campus and one year by time
+def find_only_events(campus_code, year):
+    events = []
+
+    results_raw = requests.post(url, data = {'txtCampus': campus_code, 'txtAno': year}).text
+
+    results = BeautifulSoup(results_raw, 'html.parser')
+
+    campus_name = results.find(attrs={'name': 'txtCampus'}).find(attrs={'selected': True}).get_text()
+
+    for one_event in results.find(attrs={"name": "txtEvento"}).find_all('option'):
+        if one_event['value'] != '':
+            events.append({
+                'name': one_event.get_text(),
+                'code': one_event['value'],
+                'year': year,
+                'campus': {'code': campus_code, 'name': campus_name},
+                'qty_certs': 0,
+                'certs': []
+            })
+
+    return events
+
+def get_qty_certs(events):
+
+    for one_event in events:
+        url_id = 0
+        count_certs = 0
+
+        aux_event = one_event
+
+        while True:
+
+            results_raw = requests.post(url_search + str(url_id), data = {'txtEvento': one_event['code']}).text
+
+            results = BeautifulSoup(results_raw, 'html.parser')
+
+            all_tr = results.find(id='data_table').find_all('tr', id = True)
+
+            if len(all_tr) == 0:
+                break
+
+            count_certs += len(all_tr)
+
+            url_id += 15
+
+        one_event['qty_certs'] = count_certs
+
+    return events
+
+def events_diff(events, year):
+
+    events_old = json.loads(open('data/test/events.json').read())
+    events_old = [one_event for one_event in events_old if one_event['year'] == year]
     
-    for one_file in dir_list:
-        owners_old = json.loads(open(path_old + one_file).read())
+    events_diff = []
 
-        for name, data in owners_old.items():
+    for one_event in events:
+        one_event_old = next((one_event_old for one_event_old in events_old if one_event_old['code'] == one_event['code']), None)
 
-            if name in owners_new:
-                owners_new[name]['certs'] += data['certs']
-            else:
-                owners_new[name] = data
+        if one_event_old != None:
+            if one_event_old['qty_certs'] != one_event['qty_certs']:
+                print(f'Name: {one_event_old["name"]}')
+                print(f'Old Qty: {one_event_old["qty_certs"]} - New Qty: {one_event["qty_certs"]}\n\n')
+                events_diff.append(one_event_old)
+                
+        else:
+            print(f'Name: {one_event["name"]} - Qty: {one_event["qty_certs"]}')
+            events_diff.append(one_event)
 
-
-    open(path_new + 'owners.json', 'wt').write(json.dumps(owners_new))
-
-def fix_nbs():
-    #Tirar NBS e excessos
-    #Isso pode gerar duplicidade
-    path_old = 'new_output/owners/old/'
-    path_new = 'new_output/owners/'
-
-    dir_list = os.listdir(path_old)
-    
-    for one_file in dir_list:
-        owners_old = json.loads(open(path_old + one_file).read())
-        owners_new = {}
-
-        for name, data in owners_old.items():
-
-            aux_name = unidecode(name)
-            aux_name = aux_name.rstrip('*.- \'" ')
-            aux_name = aux_name.lstrip('*.- \'" ')
-            
-            while True:
-                if aux_name.find('  ') != -1:
-                    aux_name = aux_name.replace('  ', ' ')
-                else:
-                    break
-
-            if aux_name in owners_new:
-                owners_new[aux_name]['certs'] += data['certs']
-            else:
-                owners_new[aux_name] = {
-                    'name': aux_name,
-                    'certs': data['certs']
-                }
-
-
-        open(path_new + one_file, 'wt').write(json.dumps(owners_new))
-    
-def similar_names():
-    path = 'new_output/owners/'
-    owners_old = json.loads(open(path + 'owners.json').read())
-
-    owners_new = {}
-
-    names_changed = []
-
-    for x_name, x_data in owners_old.items():
-        aux_owner_certs = []
-        aux_count_certs = {'name': '', 'certs': 0}
-        if not x_name in owners_new:
-
-            for y_name, y_data in owners_old.items():
-                if not y_name in owners_new:
-
-                    distance = Levenshtein.distance(x_name, y_name)
-
-                    #max_distance = int(len(x_owner)/4)
-                    max_distance = 2
-
-                    if distance <= max_distance:
-                        if len(y_data["certs"]) >= aux_count_certs['certs']: aux_count_certs = {'name': y_name, 'certs': len(y_data["certs"])}
-
-                        aux_owner_certs += y_data["certs"]
-
-                        names_changed.append([x_name, y_name])
-
-            owners_new[aux_count_certs['name']] = {'name': aux_count_certs['name'], 'certs': aux_owner_certs}
-
-    open(path + 'owners_no_similar.json', 'wt').write(json.dumps(owners_new))
-    open(path + 'names_changed.json', 'wt').write(json.dumps(names_changed))
-
-def check_similar():
-    path = 'new_output/owners/'
-    owners_old = json.loads(open(path + 'owners.json').read())
-
-    for x_name, x_data in owners_old.items():
-
-        for y_name, y_data in owners_old.items():
-
-            distance = Levenshtein.distance(x_name, y_name)
-
-            #max_distance = int(len(x_owner)/4)
-            max_distance = 3
-
-            if distance <= max_distance and distance > 2:
-                print(f'{x_name} -- > {y_name}')
-
-def biggest_name():
-    path = 'new_output/owners/'
-    owners = json.loads(open(path + 'owners.json').read())
-
-    name_str = ''
-    name_size = 0
-
-    for name in owners:
-
-        if len(name) > name_size and len(name) < 1000: 
-            name_str = name
-            name_size = len(name)
-
-    print(name_str)
-    print(name_size)
-
-def event_most_popular():
-    path = 'new_output/events/'
-
-    dir_list = os.listdir(path)
-    
-    event_name = ''
-    qty_certs = 0
-
-    for one_file in dir_list:
-
-        events = json.loads(open(path + one_file).read())
-
-        for event in events:
-
-            if event['qty_certs'] > qty_certs: 
-                event_name = event['name']
-                qty_certs = event['qty_certs']
-
-            if event['qty_certs'] > 1000: 
-                print(f'{event["name"]} ({event["qty_certs"]})')
-
-    #print(f'{event_name} ({qty_certs})')
-
-def test_mongo():
-
-    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-    mydb = myclient["teste_mongo_0"]
-
-    mycol = mydb["events"]
-
-    path = 'new_output/events/'
-
-    dir_list = os.listdir(path)
-    
-    for one_file in dir_list:
-
-        events = json.loads(open(path + one_file).read())
-
-        if events:
-            mycol.insert_many(events)
-
-test_mongo()
+    return events_diff
 
 def main():
 
@@ -360,293 +278,18 @@ def main():
     - campus_codes
 
     """
-
-    option = 'init'
-
-    #   CT -> 1   AP -> 2    CM -> 3    DV -> 4    FB -> 5    GP -> 6   LD -> 7
-    #   MD -> 8   PB -> 9    PG -> 10   SH -> 11   TD -> 12   CP -> 13
-    campus = '13'
-
-    #   2013 -> 2014 -> 2015 -> 2016 -> 2017 -> 2018 -> 2019 -> 2020
-    #year = ['2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021']
-    year = '2018'
-
-    url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica/'
-    url_search = 'http://apl.utfpr.edu.br/extensao/certificados/listaCertificadosPublicos/'
-
-    events = []
-    owners = []
-
-    #str1 = 'MAGDA EUGNIA PINHEIRO BRANDÆO COSTA CARVALHO TEIXEIRA'
-
-    #open('test_break.json', 'wt').write(json.dumps({'str1': str1, 'unicode1': unidecode(str1)}))
+    option = 'update'
 
     if option == 'init':
-        events = find_events_year(campus, url, year)
-        events, owners = find_owners(events, url_search)
-        save_json(events, owners, year)
+        init_db()
 
-
+    elif option == 'update':
+        update_db()
 
 ############################################################
 ############################################################
 ############################################################
 ############################################################
 
-
-
-
-def main1():
-    #0 -> Update
-    #1 -> Run
-    #2 -> Join Certificates
-
-    action = 1
-
-    #   CT -> 1   AP -> 2    CM -> 3    DV -> 4    FB -> 5    GP -> 6   LD -> 7
-    #   MD -> 8   PB -> 9    PG -> 10   SH -> 11   TD -> 12   CP -> 13
-    campus = '13'
-
-    #   2013 -> 2014 -> 2015 -> 2016 -> 2017 -> 2018 -> 2019 -> 2020
-    #year = ['2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021']
-    year = ['2022']
-
-    url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica/'
-    url_search = 'http://apl.utfpr.edu.br/extensao/certificados/listaCertificadosPublicos/'
-
-    events = {}
-    students = {}
-
-    if(action == 0):  
-        events = stage_1(campus, year, url)
-        stage_update(events, url_search)
-
-    elif(action == 1):
-        events = stage_1(campus, year, url)
-        students = stage_2(events, url_search)
-        stage_3(events, students, year)
-
-    elif(action == 2):
-        n_1 = 'c1'
-        n_2 = 'c2'
-
-        res = join_certificates(json.loads(open(n_1 + '.json').read()), json.loads(open(n_2 + '.json').read()))
-
-        open(n_1 + '-' + n_2 + '.json', 'wt').write(json.dumps(res))
-
-    elif(action == 3):
-        res = json.loads(open('output/new_new_new_new_new_results.json').read())
-
-        #for name in res:
-        #    for name_1 in res:
-        #        if(name_1 != name):
-        #            if(name_1.find(name) != -1):
-        #                print(name_1 + ' -> ' + name)
-
-        #soma = 0
-
-        #for name, ye in res.items():
-        #    for y in ye:
-        #        soma += len(res[name][y])
-
-        #print(soma)
-
-        #for name, ye in res.items():
-        #    num_aux = name.find('  ')
-        #    if num_aux != -1:
-        #        print(name)
-        #        soma += 1
-
-        #print(soma)
-        
-        print(len(res))
-
-    elif(action == 7):
-        res_new = {}
-
-        res = json.loads(open('output/results.json').read())
-
-        for name, year_dict in res.items():
-            name_new = name.replace("  ", " ")
-            
-            if name_new not in res_new:
-                res_new[name_new] = year_dict
-            
-            else:
-                for year, certName_list in year_dict.items():
-                    if year not in res_new[name_new]:
-                        res_new[name_new][year] = certName_list
-
-                    else:
-                        for certName in certName_list:
-                            res_new[name_new][year].append(certName)
-
-        open('output/new_results.json', 'wt').write(json.dumps(res_new))
-
-def stage_1(campus_, year_, url_):
-    events_ = {}
-
-    for y in year_:
-
-        events_[y] = []
-
-        data_ = {'txtCampus': campus_, 'txtAno': y}
-
-        results = requests.post(url_, data = data_).text
-        results = results.split('value="">Selecione')[1].split('value="')
-        results.pop(0)
-
-        for events_raw in results:
-            aux_event = events_raw.split('" >')
-
-            events_[y].append([aux_event[0],aux_event[1].split('</option>')[0]])
-
-    return events_
-
-def stage_2(events_, url_):
-    students_ = {}
-
-    for y, e_list in events_.items():
-        print('Start -> ' + y)
-        time_start = datetime.datetime.now()
-
-        for evnt in e_list:
-
-            sub_id = 0
-            text_raw = []
-            
-            while True:
-                results = requests.post(url_ + str(sub_id), data = {'txtEvento': evnt[0]}).text
-                
-                if('\')">' in results):
-                    results = results.split('\')">')
-                    results.pop(0)
-                    text_raw.extend(results)
-                else:
-                    break
-
-                sub_id += 15
-
-            for aux in text_raw:
-                aux_name = aux[aux.find('>') + 1:aux.find('</')]
-                aux_name = aux_name.upper()
-                aux_name = aux_name.rstrip('*.- \'"')
-                aux_name = aux_name.lstrip('*.- \'"')
-                
-                for i in range(3):
-                    aux_name = aux_name.replace("  ", " ")
-
-                aux_cert = aux.split('http://apl.utfpr.edu.br/extensao/certificados/validar/')[1].split('">')[0]
-
-                if aux_name in students_:
-                    if y in students_[aux_name]:
-                        students_[aux_name][y].append([aux_cert, evnt[1]])
-                    else:
-                        students_[aux_name][y] = [[aux_cert, evnt[1]]]
-
-                else:
-                    students_[aux_name] = {}
-                    students_[aux_name][y] = [[aux_cert, evnt[1]]]
-
-        print('End -> ' + str(datetime.datetime.now() - time_start))
-
-    return students_
-
-def stage_3(events_, students_, year_):
-
-    path = 'output'
-
-    try:
-        os.mkdir(path)
-    except:
-        #shutil.rmtree(path)
-        #os.mkdir(path)
-        print('\a')
-
-    #open(path + '/results.json', 'wt').write(json.dumps(students_))
-    #open(path + '/events.json', 'wt').write(json.dumps(events_))
-
-    open('results.json', 'wt').write(json.dumps(students_))
-    open('events.json', 'wt').write(json.dumps(events_))
-
-def diff_events(events_old, events_new):
-
-    events_diff = {}
-    '''
-    for year, e_new in events_new.items():
-        for evnt in e_new:
-            if year not in events_old:
-                events_old[year] = []
-
-            if(events_old[year].count(evnt) == 0):
-                if year in events_diff:
-                    events_diff[year].append([evnt])
-                else:
-                    events_diff[year] = [evnt]
-    '''
-
-    for year, e_new in events_new.items():
-        for evnt in e_new:
-            if year not in events_old:
-                events_old[year] = []
-
-            if(events_old[year].count(evnt) == 0):
-                if year in events_diff:
-                    events_diff[year].append(evnt)
-                else:
-                    events_diff[year] = [evnt]
-
-    return events_diff
-
-def join_certificates(certificates_1, certificates_2):
-
-    for name, year_dict in certificates_1.items():
-        for year, cert_list in year_dict.items():
-            for cert in cert_list:
-                if name in certificates_2:
-                    if year in certificates_2[name]:
-                        certificates_2[name][year].append(cert)
-                    else:
-                        certificates_2[name][year] = [cert]
-                else:
-                    certificates_2[name] = {}
-                    certificates_2[name][year] = [cert]
-
-    return certificates_2
-
-def stage_update(events_, url_):
-    e_old = json.loads(open('output/events.json').read())
-    s_old = json.loads(open('output/results.json').read())
-    
-    e_diff = diff_events(e_old, events_)
-
-    s_diff = stage_2(e_diff, url_)
-
-    s_new = join_certificates(s_diff, s_old)
-
-    dt = datetime.datetime.now()
-    date = str(dt.strftime("%d")) + str(dt.strftime("%m")) + str(dt.strftime("%y"))
-    time = str(dt.strftime("%H")) + str(dt.strftime("%M")) + str(dt.strftime("%S"))
-    path = ''
-
-    path = 'output/' + date + '-' + time + '-'
-
-    if(len(e_diff) == 0):
-        print('Nothing Changes..')
-    
-    else:
-        print('Events Changes..')
-        open(path + 'e_diff_to_now.json', 'wt').write(json.dumps(e_diff))
-        open(path + 'events.json', 'wt').write(json.dumps(events_))
-
-        if(len(s_diff) == 0):
-            print('Certificates Dont Changes..')
-
-        else:
-            print('Certificates Changes..')
-            open(path + 's_diff_to_now.json', 'wt').write(json.dumps(s_diff))
-            open(path + 'results.json', 'wt').write(json.dumps(s_new))
-    
 if __name__ == '__main__':
-    #main()
-    print()
+    main()
