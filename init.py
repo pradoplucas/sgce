@@ -7,6 +7,9 @@ mydb = myclient["certs"]
 mycol_events = mydb["events"]
 mycol_owners = mydb["owners"]
 
+mycol_events.drop()
+mycol_owners.drop()
+
 events = json.loads(open('events.json').read())
 owners = json.loads(open('owners.json').read())
 

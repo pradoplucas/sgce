@@ -49,6 +49,7 @@ def find_events_all(campus_, url_):
                 if one_event['value'] != '':
                     events_.append({
                         'name': one_event.get_text(),
+                        'name_search': unidecode(one_event.get_text().upper()),
                         'code': one_event['value'],
                         'year': one_year['value'],
                         'campus': {'code': campus_, 'name': campus_name},
@@ -71,6 +72,7 @@ def find_events_year(campus_, url_, year_):
         if one_event['value'] != '':
             events_.append({
                 'name': one_event.get_text(),
+                'name_search': unidecode(one_event.get_text().upper()),
                 'code': one_event['value'],
                 'year': year_,
                 'campus': {'code': campus_, 'name': campus_name},
@@ -200,6 +202,7 @@ def find_only_events(campus_code, year):
         if one_event['value'] != '':
             events.append({
                 'name': one_event.get_text(),
+                'name_search': unidecode(one_event.get_text().upper()),
                 'code': one_event['value'],
                 'year': year,
                 'campus': {'code': campus_code, 'name': campus_name},
@@ -258,7 +261,9 @@ def events_diff(events, year):
 
     return events_diff
 
-def main():
+
+
+def main1():
 
     """ 
     init_all

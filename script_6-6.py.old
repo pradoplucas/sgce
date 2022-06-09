@@ -360,6 +360,13 @@ def test_vel():
     #x = mycol.find_one({'name': {'$regex': '(?i)' + 'BOARD'}})
     #c = next((x for x in owners_list if x['name'] == 'LUCAS DO PRADO PINTO'), None)
 
+def create_name_search():
+    events = json.loads(open('data/events.json').read())
+
+    for one_event in events:
+        one_event['name_search'] = unidecode(one_event['name'].upper())
+
+    open('data/events.json', 'wt').write(json.dumps(events))
 
 
 def main():
